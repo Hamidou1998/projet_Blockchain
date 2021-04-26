@@ -1,5 +1,9 @@
 import java.io.Serializable;
-
+/**
+*
+* @author Fantome_Hamidou
+* 
+*/
 public class ReponseTransaction implements Serializable{
 	
 	public Transaction transaction;
