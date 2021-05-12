@@ -1,4 +1,5 @@
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
@@ -11,11 +12,14 @@ public class Etat implements Serializable, Cloneable  {
 	//Le tableau de l'argent dont l'indice sont les personnes 
 	private Integer[] portefeuille;
 		
-	
 	//Constructeur
     public Etat(Integer[] tab) {
 		this.portefeuille = tab.clone();
 	 }
+    //construteur en copie 
+    Etat(Etat etat) { 
+        this(etat.portefeuille.clone());
+    }
     
     //la methode clone pour la copie du constructeur
     public Etat clone(){
