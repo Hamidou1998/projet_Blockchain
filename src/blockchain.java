@@ -17,18 +17,17 @@ public class blockchain {
 	public blockchain() {
 		listBlock = new ArrayList<>();
 	}
-	   void init() {
-	        // l’initialisation de la répartition initiale  
-	        // chaque individue commence avec un solde de 100 monnaie 
-
-	        ArrayList<Integer> individues = new ArrayList<>(100);
-	        for (int i = 0; i < individues.size(); i++) {
-	            individues.set(i, 100);
+	//methode qui permet la repartision des monaies 
+	//ou tout les personne a l'etat initiale ont une somme de 200
+	 public void initialisation() {
+		   Integer[] personne=new Integer[20];
+	        for (int i = 0; i < personne.length; i++) {
+	            personne[i]=200;
 	        }
-
-	        Etat etat = new Etat(individues);
-	        this.listBlock.add(new Jonction(null, new block(etat, null)));
+	        Etat etat = new Etat(personne);
+	        //this.listBlock.add(new Jonction(null, new block(etat, null)));
 	    }
+	 //On prends le dernier block 
 	public Jonction dernierBlock() {
 		return this.listBlock.get(this.listBlock.size() - 1);
 	}
@@ -62,18 +61,21 @@ public class blockchain {
 	  
 	}
 
-	public boolean addBlock(block b, int sel)
+	public boolean addBlock(Transaction transaction, int sel,int difficulte)
 	{
+		
+		 Etat etat = new Etat(this.dernierBlock().block.getEtatFinal());
+	     block b = new block(etat, transaction);
+	     
 		if (this.verif(b) == false) {
 			return false;
 		}
-		if (this.inserable(3, sel, b)) {
+		if (this.inserable(difficulte, sel, b)) {
 			return false;
 		}
 		Jonction j = new Jonction(b, sel, this.getHashNewNode(b, sel));
 		this.listBlock.add(j);
 		return true;
 	}
-	
 	
 }
