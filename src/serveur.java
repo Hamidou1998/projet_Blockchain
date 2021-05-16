@@ -7,6 +7,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.ArrayList;
+import java.util.Scanner;
 
 /**
 *
@@ -31,29 +32,85 @@ public class serveur extends Thread {
 	 volatile static ArrayList<Socket> mineur = new ArrayList<>();
 	 public ServerSocket multicastSocket;
 	 
+	 volatile boolean interruption = true;
 	 
 	public static void main(String[] args) {
+		System.out.println("\n\n------------------Serveur en execution !!!------------------\n");
+		System.out.println("Serveur en cours d'initilisation..............");
+		serveur serveur = new serveur();
+		System.out.println("Serveur a ete initialiser..............\n");
+		System.out.println("Le hash du blockchaine est "+serveur.blockchaine.hashCode()+".......");
+		Scanner sc = new Scanner(System.in);
 		new serveur().start();
+		while(true) {
+			System.out.println("Veillez saisir 1 ");
+			int num=sc.nextInt();
+				if(num==1) {
+					System.out.println("Le hash du blockchaine est "+serveur.blockchaine.hashCode()+".......");
+				}
+				else
+				{
+					serveur.close();
+					break;
+				}	
+		}
+			
 	}
 	
-	public void run() {
-		
+	public serveur() {
+		super();
 		blockchaine=new blockchain();
 		blockchaine.initialisation();
 		
-		try {
-			
-			this.initSocket=new ServerSocket(portInit);
-			this.TransactionSocket=new ServerSocket(portTransaction);
-			this.multicastSocket=new ServerSocket(portmulticast);
+		try {			
+				this.initSocket=new ServerSocket(portInit);
+				this.TransactionSocket=new ServerSocket(portTransaction);
+				this.multicastSocket=new ServerSocket(portmulticast);
 			
 		} catch (IOException e) {
 			
 			e.printStackTrace();
 		}
-		
-		super.run();
 	}
+
+    synchronized void nextDifficulte() {
+        throw new UnsupportedOperationException("Non supporter........."); 
+    }
+	public void run() {
+		
+		try {
+			while(interruption)
+			{		
+				Socket socketInit =this.initSocket.accept();
+				System.out.println("Un mineur demande l'actuel de la blockaine ................");
+				new initTask(socketInit).start();
+				
+				Socket socketTransaction=this.transactionServeur.accept();
+				System.out.println("Nouvelle transaction en cours de traitement .................");
+				new TransactionTask(socketTransaction).start();
+				
+				Socket socketMulticast =this.multicastSocket.accept();
+				System.out.println("Un nouveau mineur a été connecté au multitask ...............");					
+				this.mineur.add(socketMulticast);
+				
+				//new MulticastTask(socketMulticast).start();
+			}
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		}	
+	}
+    public void close() {
+        this.interruption = true;
+
+        this.mineur.forEach(mineurs -> {
+            try {
+                mineurs.close();
+            } catch (Exception ex) {
+            }
+        });
+        this.mineur.clear();
+    }
 	
 	public class initTask extends Thread {
 		
@@ -62,31 +119,54 @@ public class serveur extends Thread {
 		public initTask(Socket socket) {
 			super();
 			this.socket = socket;
+		}	
+		public void run() {
+					
+				try {
+						this.socket.setSoTimeout(100);
+						socket = initSocket.accept();
+						System.out.println("Un nouveau mineur demande l'etat...");
+						OutputStream o = socket.getOutputStream();
+						ObjectOutputStream os=new ObjectOutputStream(o);
+						os.writeObject(serveur.blockchaine);
+						os.close();
+							
+					} catch (IOException e) {
+						
+						e.printStackTrace();
+					}
+					finally {
+			            try {
+			                socket.close();
+			            } catch (IOException ex) {
+			        }
+					
+				}
+			}
+	}
+		
+	public class MulticastTask extends Thread {
+		 
+		ReponseTransaction response;
+		
+		public MulticastTask(ReponseTransaction response) {
+			super();
+			this.response = response;
 		}
 		
-	public void run() {
-					
-		try {
-				this.socket.setSoTimeout(100);
-				socket = initSocket.accept();
-				System.out.println("Un nouveau mineur demande l'etat...");
-				OutputStream o = socket.getOutputStream();
-				ObjectOutputStream os=new ObjectOutputStream(o);
-				os.writeObject(serveur.blockchaine);
-				os.close();
-					
-			} catch (IOException e) {
-				
-				e.printStackTrace();
-			}
-			finally {
-	            try {
-	                socket.close();
-	            } catch (IOException ex) {
-	        }
-			
+		@Override
+		public void run() {
+			  serveur.mineur.forEach((mineur) -> {
+		            try (ObjectOutputStream os = new ObjectOutputStream(mineur.getOutputStream())) {
+		                os.writeObject(response);
+		                os.flush();
+		            } catch (IOException ex) {
+		                ex.printStackTrace();
+		            }
+		        });
+		    }
 		}
-	}
+	
 	public class TransactionTask extends Thread{
 		
 		Socket socket;
@@ -105,9 +185,8 @@ public class serveur extends Thread {
 					InputStream os=socket.getInputStream();
 					ObjectInputStream is = new ObjectInputStream(os);
 		            transactionRequest = (RequeteTransaction) is.readObject();
-					 
 		            chaine.addBlock(transactionRequest.transaction, transactionRequest.sel,difficulte);
-		            //serveur.nextDifficulte();
+		            nextDifficulte();
 		            valid = true;
 		            
 			} catch (SocketException e) {
@@ -125,7 +204,7 @@ public class serveur extends Thread {
 		                ObjectOutputStream os = new ObjectOutputStream(socket.getOutputStream());
 		                if (valid) {
 		                    ReponseTransaction reponse = new ReponseTransaction(transactionRequest.transaction, transactionRequest.sel, serveur.difficulte, true);
-		                   // serveur.multicast(reponse); 
+		                   //serveur.multicast(reponse); 
 		                    os.writeObject(reponse);
 		                    os.close();
 
@@ -147,28 +226,7 @@ public class serveur extends Thread {
 
 		    }
 		
-		}
-	public class MulticastTask extends Thread {
-		 
-		ReponseTransaction response;
-		
-		public MulticastTask(ReponseTransaction response) {
-			super();
-			this.response = response;
-		}
-
-		@Override
-		public void run() {
-			  serveur.mineur.forEach((mineur) -> {
-		            try (ObjectOutputStream os = new ObjectOutputStream(mineur.getOutputStream())) {
-		                os.writeObject(response);
-		                os.flush();
-		            } catch (IOException ex) {
-		                ex.printStackTrace();
-		            }
-		        });
-		    }
-		}
 	}
+
 	
 }
